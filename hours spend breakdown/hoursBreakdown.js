@@ -833,6 +833,7 @@ function restoreDatasetB() {
 }
 
 // Enhanced PDF Generation Function with Charts and Better Formatting
+// Enhanced PDF Generation Function with Charts First and Better Formatting
 async function generatePDFReport() {
   try {
     console.log('PDF Generation started - Mode:', isComparisonMode ? 'Comparison' : 'Single');
@@ -883,19 +884,20 @@ async function generatePDFReport() {
       return y + 15;
     }
 
-    // Title and Header ONLY
+    // Simplified Header - Title and Date Only
     doc.setFontSize(22);
     doc.setFont(undefined, 'bold');
     doc.setTextColor(52, 73, 94); // Dark blue-gray
     doc.text('Inbound Hours Breakdown Report', pageWidth / 2, yPosition, { align: 'center' });
     yPosition += 15;
 
-    // Subtitle with date
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(127, 140, 141); // Gray
-    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 10;
+    // Generate dynamic filename based on mode
+    let fileName;
+    if (isComparisonMode) {
+      fileName = `inbound-hours-comparison_${new Date().toISOString().split('T')[0]}.pdf`;
+    } else {
+      fileName = `inbound-hours-analysis_${new Date().toISOString().split('T')[0]}.pdf`;
+    }
     
     // Add decorative line
     doc.setDrawColor(52, 152, 219);
@@ -918,9 +920,9 @@ async function generatePDFReport() {
       doc.text('No data available to generate report.', margin, yPosition);
     }
 
-    // Save the PDF
-    const fileName = isComparisonMode ? 'inbound-hours-comparison-report.pdf' : 'inbound-hours-analysis-report.pdf';
+    // Save the PDF with dynamic filename
     doc.save(fileName);
+    console.log('PDF saved as:', fileName);
     
   } catch (error) {
     console.error('Error generating PDF:', error);
@@ -928,44 +930,23 @@ async function generatePDFReport() {
   }
 }
 
-// Generate Comparison Mode PDF
+// Generate Comparison Mode PDF - Charts First, No Executive Summary or Key Insights
 async function generateComparisonPDF(doc, pageWidth, pageHeight, margin, yPosition, checkPageBreak, drawLine, addSectionHeader) {
-  // Executive Summary Section
-  yPosition = addSectionHeader('Executive Summary', yPosition);
   
-  doc.setFontSize(11);
-  doc.setFont(undefined, 'normal');
-  doc.setTextColor(44, 62, 80);
-  
-  const totalHoursA = datasetA.total;
-  const totalHoursB = datasetB.total;
-  const hoursDifference = totalHoursB - totalHoursA;
-  const percentChange = totalHoursA > 0 ? ((hoursDifference / totalHoursA) * 100) : 0;
-  
-  doc.text(`Dataset A (4-Week Average): ${totalHoursA.toFixed(2)} hours`, margin, yPosition);
-  yPosition += 8;
-  doc.text(`Dataset B (Daily Data): ${totalHoursB.toFixed(2)} hours`, margin, yPosition);
-  yPosition += 8;
-  
-  // Color code the difference
-  const changeColor = hoursDifference > 0 ? [231, 76, 60] : [46, 204, 113]; // Red for increase, Green for decrease
-  doc.setTextColor(...changeColor);
-  doc.text(`Total Change: ${hoursDifference >= 0 ? '+' : ''}${hoursDifference.toFixed(2)} hours (${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(1)}%)`, margin, yPosition);
-  doc.setTextColor(44, 62, 80); // Reset to dark
-  yPosition += 20;
+  // Start with Charts - Visual Comparison Section
+  doc.setFontSize(16);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(41, 128, 185);
+  doc.text('Visual Comparison', margin, yPosition);
+  yPosition += 15;
 
-  checkPageBreak(100);
-
-  // Add charts
+  // Add charts first
   yPosition = await addChartsToComparison(doc, yPosition, pageWidth, margin, checkPageBreak);
 
   checkPageBreak(150);
 
-  // Check if we need a new page for the table
-  checkPageBreak(100);
-  
-  // Detailed Analysis Section
-  yPosition = addSectionHeader('Detailed Function Analysis', yPosition);
+  // Detailed Analysis Section - Just the table, no summary text
+  yPosition = addSectionHeader('Function Analysis', yPosition);
   
   // Create a more readable table with better spacing
   const tableWidth = pageWidth - 2 * margin;
@@ -1006,7 +987,7 @@ async function generateComparisonPDF(doc, pageWidth, pageHeight, margin, yPositi
     return percentA_b - percentA_a;
   });
   
-  console.log('PDF: Processing', sortedGroups.length, 'function groups:', sortedGroups); // Debug log
+  console.log('PDF: Processing', sortedGroups.length, 'function groups:', sortedGroups);
   
   let rowIndex = 0;
   sortedGroups.forEach(group => {
@@ -1054,102 +1035,52 @@ async function generateComparisonPDF(doc, pageWidth, pageHeight, margin, yPositi
     rowIndex++;
   });
 
-  // Key insights section
-  if (yPosition > pageHeight - 100) {
-    doc.addPage();
-    yPosition = margin;
-  } else {
-    yPosition += 15;
-  }
-  
-  yPosition = addSectionHeader('Key Insights & Recommendations', yPosition);
+  // Add basic totals summary at the end
+  yPosition += 15;
+  checkPageBreak(30);
   
   doc.setFontSize(10);
-  doc.setFont(undefined, 'normal');
-  
-  // Summary stats
-  const totalGroups = sortedGroups.length;
-  const overspendGroups = sortedGroups.filter(group => {
-    const hoursA = datasetA.totals[group] || 0;
-    const hoursB = datasetB.totals[group] || 0;
-    const percentA = datasetA.total > 0 ? (hoursA / datasetA.total * 100) : 0;
-    const percentB = datasetB.total > 0 ? (hoursB / datasetB.total * 100) : 0;
-    return (percentB - percentA) > 2;
-  }).length;
-  
-  const underspendGroups = sortedGroups.filter(group => {
-    const hoursA = datasetA.totals[group] || 0;
-    const hoursB = datasetB.totals[group] || 0;
-    const percentA = datasetA.total > 0 ? (hoursA / datasetA.total * 100) : 0;
-    const percentB = datasetB.total > 0 ? (hoursB / datasetB.total * 100) : 0;
-    return (percentB - percentA) < -2;
-  }).length;
-
-  // Overall summary
   doc.setFont(undefined, 'bold');
-  doc.text('Summary:', margin, yPosition);
-  yPosition += 12;
-  doc.setFont(undefined, 'normal');
-  doc.text(`• Total Functions Analyzed: ${totalGroups}`, margin, yPosition);
-  yPosition += 10;
-  doc.setTextColor(231, 76, 60);
-  doc.text(`• Functions Over Budget (>2%): ${overspendGroups}`, margin, yPosition);
-  yPosition += 10;
-  doc.setTextColor(46, 204, 113);
-  doc.text(`• Functions Under Budget (>2%): ${underspendGroups}`, margin, yPosition);
-  yPosition += 15;
   doc.setTextColor(44, 62, 80);
   
-  // Find biggest changes
-  const significantChanges = sortedGroups
-    .map(group => {
-      const hoursA = datasetA.totals[group] || 0;
-      const hoursB = datasetB.totals[group] || 0;
-      const percentA = datasetA.total > 0 ? (hoursA / datasetA.total * 100) : 0;
-      const percentB = datasetB.total > 0 ? (hoursB / datasetB.total * 100) : 0;
-      return { group, diff: percentB - percentA };
-    })
-    .filter(item => Math.abs(item.diff) > 1)
-    .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
-
-  if (significantChanges.length > 0) {
-    doc.setFont(undefined, 'bold');
-    doc.text('Significant Changes (>1% vs 4-week average):', margin, yPosition);
-    yPosition += 12;
-    doc.setFont(undefined, 'normal');
-    
-    significantChanges.slice(0, 6).forEach((change, index) => {
-      checkPageBreak(12);
-      const color = change.diff > 0 ? [231, 76, 60] : [46, 204, 113];
-      const arrow = change.diff > 0 ? '^' : 'v'; // Use simple ASCII characters
-      const status = change.diff > 0 ? 'OVER' : 'UNDER';
-      
-      doc.setTextColor(44, 62, 80);
-      doc.text(`${index + 1}. ${change.group}:`, margin + 5, yPosition);
-      doc.setTextColor(...color);
-      doc.text(`${arrow} ${status} by ${Math.abs(change.diff).toFixed(1)}%`, margin + 90, yPosition);
-      yPosition += 10;
-    });
-  } else {
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(46, 204, 113);
-    doc.text('✓ All functions are within 1% of their 4-week average', margin, yPosition);
-    yPosition += 12;
-  }
+  const totalHoursA = datasetA.total;
+  const totalHoursB = datasetB.total;
+  const hoursDifference = totalHoursB - totalHoursA;
+  const percentChange = totalHoursA > 0 ? ((hoursDifference / totalHoursA) * 100) : 0;
+  
+  doc.text('Summary Totals:', margin, yPosition);
+  yPosition += 12;
+  doc.setFont(undefined, 'normal');
+  doc.text(`Dataset A (4-Week Average): ${totalHoursA.toFixed(2)} hours`, margin, yPosition);
+  yPosition += 8;
+  doc.text(`Dataset B (Daily Data): ${totalHoursB.toFixed(2)} hours`, margin, yPosition);
+  yPosition += 8;
+  
+  // Color code the difference
+  const changeColor = hoursDifference > 0 ? [231, 76, 60] : [46, 204, 113];
+  doc.setTextColor(...changeColor);
+  doc.text(`Total Change: ${hoursDifference >= 0 ? '+' : ''}${hoursDifference.toFixed(2)} hours (${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(1)}%)`, margin, yPosition);
 }
 
-// Generate Single Analysis PDF
+// Generate Single Analysis PDF - Charts First, No Executive Summary
 async function generateSingleAnalysisPDF(doc, pageWidth, pageHeight, margin, yPosition, checkPageBreak, drawLine, addSectionHeader) {
   console.log('Starting single analysis PDF generation');
+  
+  // Start with Chart
+  doc.setFontSize(16);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(41, 128, 185);
+  doc.text('Hours Distribution', margin, yPosition);
+  yPosition += 10;
   
   // Add chart first
   yPosition = await addChartToSingle(doc, yPosition, pageWidth, margin, checkPageBreak);
 
-  // Force page break after chart for better layout
-  doc.addPage();
-  yPosition = margin;
+  // Add some space before table
+  yPosition += 20;
+  checkPageBreak(100);
 
-  // Detailed breakdown table (starts on page 2)
+  // Detailed breakdown table
   yPosition = addSectionHeader('Function Breakdown', yPosition);
   
   // Table setup
@@ -1227,7 +1158,15 @@ async function generateSingleAnalysisPDF(doc, pageWidth, pageHeight, margin, yPo
     rowIndex++;
   });
 
-  // End of report - no insights section
+  // Add basic total at the end
+  yPosition += 15;
+  checkPageBreak(20);
+  
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(44, 62, 80);
+  doc.text(`Total Inbound Hours: ${singleModeData.total.toFixed(2)} hours`, margin, yPosition);
+
   console.log('Single analysis PDF generation completed');
 }
 

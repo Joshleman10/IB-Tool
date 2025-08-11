@@ -20,11 +20,14 @@ fetch('item_master.json')
   .then(response => response.json())
   .then(data => {
     itemMasterData = data['Sheet1'].reduce((map, item) => {
-      const key = Math.floor(Number(item.ITEM_NUMBER));
+      // Handle both string and number formats
+      const key = Number(item.ITEM_NUMBER);
       map[key] = item;
       return map;
     }, {});
     console.log('Item master data loaded successfully');
+    console.log('Sample items in master data:', Object.keys(itemMasterData).slice(0, 10));
+    console.log('Total items in master data:', Object.keys(itemMasterData).length);
   })
   .catch(error => {
     console.error('Error loading item master data:', error);
@@ -189,12 +192,17 @@ function calculateMetricsForData(data) {
   const allSmallVolume = [], cartToAir = [];
   let modTransactionCount = 0;
   
-  // Add debugging arrays to track issues
+  // Enhanced debugging arrays
   const debugInfo = {
     itemsNotFound: [],
     invalidVolumes: [],
-    processingErrors: []
+    processingErrors: [],
+    itemLookupIssues: [],
+    volumeCalculations: []
   };
+
+  console.log('Starting calculateMetricsForData with', data.length, 'transactions');
+  console.log('Item master data available:', Object.keys(itemMasterData).length, 'items');
 
   data.forEach((entry, index) => {
     try {
@@ -214,50 +222,91 @@ function calculateMetricsForData(data) {
         airCount++;
       }
 
-      // IMPROVED VOLUME ANALYSIS
+      // ENHANCED VOLUME ANALYSIS FOR NEW JSON FORMAT
       if (formatRegex.test(loc)) {
-        // More robust item number parsing
+        // Validate item number exists
         const itemNumber = entry.item;
-        if (!itemNumber || itemNumber === "") {
+        if (!itemNumber || itemNumber === "" || itemNumber === null || itemNumber === undefined) {
           debugInfo.processingErrors.push({
             index, 
-            issue: 'Missing item number', 
+            issue: 'Missing or null item number', 
             entry: { location: loc, item: itemNumber, quantity: entry.quantity }
-          });
-          return; // Skip this entry
-        }
-        
-        // Handle item lookup more carefully
-        let item;
-        try {
-          item = Math.floor(Number(itemNumber));
-          if (isNaN(item) || item <= 0) {
-            debugInfo.processingErrors.push({
-              index, 
-              issue: 'Invalid item number format', 
-              entry: { location: loc, item: itemNumber, quantity: entry.quantity }
-            });
-            return;
-          }
-        } catch (e) {
-          debugInfo.processingErrors.push({
-            index, 
-            issue: 'Item number conversion error', 
-            entry: { location: loc, item: itemNumber, quantity: entry.quantity },
-            error: e.message
           });
           return;
         }
         
-        // Check if item exists in master data
-        if (!itemMasterData[item]) {
+        // Try multiple ways to match the item number
+        let item;
+        let itemData;
+        
+        // Method 1: Direct number conversion
+        try {
+          item = Number(itemNumber);
+          if (isNaN(item) || item <= 0) {
+            throw new Error('Invalid number conversion');
+          }
+          itemData = itemMasterData[item];
+        } catch (e) {
+          debugInfo.itemLookupIssues.push({
+            index,
+            method: 'Direct number conversion',
+            itemNumber,
+            error: e.message
+          });
+        }
+        
+        // Method 2: Try as string key if direct number failed
+        if (!itemData) {
+          const itemStr = String(itemNumber);
+          itemData = itemMasterData[itemStr];
+          if (itemData) {
+            item = itemStr;
+            debugInfo.itemLookupIssues.push({
+              index,
+              method: 'String lookup succeeded',
+              itemNumber,
+              foundAs: itemStr
+            });
+          }
+        }
+        
+        // Method 3: Try Math.floor conversion (original logic)
+        if (!itemData) {
+          try {
+            item = Math.floor(Number(itemNumber));
+            if (!isNaN(item) && item > 0) {
+              itemData = itemMasterData[item];
+              if (itemData) {
+                debugInfo.itemLookupIssues.push({
+                  index,
+                  method: 'Math.floor conversion succeeded',
+                  itemNumber,
+                  convertedTo: item
+                });
+              }
+            }
+          } catch (e) {
+            debugInfo.itemLookupIssues.push({
+              index,
+              method: 'Math.floor conversion failed',
+              itemNumber,
+              error: e.message
+            });
+          }
+        }
+        
+        // If still no item found, log and skip
+        if (!itemData) {
           debugInfo.itemsNotFound.push({
             index,
             itemNumber: itemNumber,
-            convertedItem: item,
-            location: loc
+            triedAsNumber: Number(itemNumber),
+            triedAsString: String(itemNumber),
+            triedAsFloor: Math.floor(Number(itemNumber)),
+            location: loc,
+            availableKeys: Object.keys(itemMasterData).slice(0, 5) // Show first 5 keys for reference
           });
-          return; // Skip this entry
+          return;
         }
         
         // Validate quantity
@@ -271,22 +320,37 @@ function calculateMetricsForData(data) {
           return;
         }
 
-        // Get volume from master data with validation
-        const itemData = itemMasterData[item];
+        // Get and validate volume from master data
         const cubicVolume = Number(itemData.CUBIC_VOL);
         
         if (isNaN(cubicVolume) || cubicVolume <= 0) {
           debugInfo.invalidVolumes.push({
             index,
             itemNumber,
-            cubicVolume: itemData.CUBIC_VOL,
-            location: loc
+            rawCubicVol: itemData.CUBIC_VOL,
+            convertedCubicVol: cubicVolume,
+            location: loc,
+            itemDataStructure: Object.keys(itemData)
           });
-          return; // Skip entries with invalid volume data
+          return;
         }
         
         // Calculate total volume
         const totalVolume = cubicVolume * quantity;
+        
+        // Log a few successful calculations for verification
+        if (debugInfo.volumeCalculations.length < 5) {
+          debugInfo.volumeCalculations.push({
+            index,
+            itemNumber,
+            quantity,
+            cubicVolume,
+            totalVolume,
+            isCartSize: totalVolume < 5000,
+            location: loc,
+            suffix
+          });
+        }
         
         // Cart transaction criteria: volume < 5000
         if (totalVolume < 5000) {
@@ -294,7 +358,7 @@ function calculateMetricsForData(data) {
             ...entry,
             itemData: {
               itemNumber: itemNumber,
-              convertedItem: item,
+              matchedItem: item,
               cubicVolume: cubicVolume,
               quantity: quantity,
               totalVolume: totalVolume
@@ -316,6 +380,7 @@ function calculateMetricsForData(data) {
         index,
         issue: 'Unexpected processing error',
         error: error.message,
+        stack: error.stack,
         entry: entry
       });
     }
@@ -338,34 +403,56 @@ function calculateMetricsForData(data) {
     cartToGround,
     cartAirPercent: allSmallVolume.length > 0 ? (cartToAir.length / allSmallVolume.length * 100).toFixed(2) : "0.00",
     modTransactionCount,
-    // Add debugging info to metrics
     debugInfo
   };
 
-  // Console logging for debugging
-  if (debugInfo.itemsNotFound.length > 0) {
-    console.warn(`${debugInfo.itemsNotFound.length} items not found in master data:`, debugInfo.itemsNotFound.slice(0, 5));
-  }
-  if (debugInfo.invalidVolumes.length > 0) {
-    console.warn(`${debugInfo.invalidVolumes.length} items with invalid volume data:`, debugInfo.invalidVolumes.slice(0, 5));
-  }
-  if (debugInfo.processingErrors.length > 0) {
-    console.warn(`${debugInfo.processingErrors.length} processing errors:`, debugInfo.processingErrors.slice(0, 5));
-  }
-  
-  console.log('Cart Transaction Summary:', {
+  // Enhanced console logging for debugging
+  console.log('=== CART TRANSACTION ANALYSIS COMPLETE ===');
+  console.log('Basic Stats:', {
     totalTransactions: data.length,
-    validMODTransactions: modTransactionCount,
+    modFormatTransactions: modTransactionCount,
     cartTransactions: allSmallVolume.length,
     cartToAir: cartToAir.length,
-    cartToGround: cartToGround,
-    itemsNotFound: debugInfo.itemsNotFound.length,
-    processingErrors: debugInfo.processingErrors.length
+    cartToGround: cartToGround
+  });
+  
+  if (debugInfo.itemsNotFound.length > 0) {
+    console.warn(`⚠️  ${debugInfo.itemsNotFound.length} items not found in master data:`);
+    console.table(debugInfo.itemsNotFound.slice(0, 10));
+    console.log('Sample of available master data keys:', Object.keys(itemMasterData).slice(0, 20));
+  }
+  
+  if (debugInfo.invalidVolumes.length > 0) {
+    console.warn(`⚠️  ${debugInfo.invalidVolumes.length} items with invalid volume data:`);
+    console.table(debugInfo.invalidVolumes.slice(0, 5));
+  }
+  
+  if (debugInfo.processingErrors.length > 0) {
+    console.warn(`⚠️  ${debugInfo.processingErrors.length} processing errors:`);
+    console.table(debugInfo.processingErrors.slice(0, 5));
+  }
+  
+  if (debugInfo.itemLookupIssues.length > 0) {
+    console.log(`ℹ️  ${debugInfo.itemLookupIssues.length} item lookup method variations used`);
+    console.table(debugInfo.itemLookupIssues.slice(0, 10));
+  }
+  
+  if (debugInfo.volumeCalculations.length > 0) {
+    console.log('✅ Sample successful volume calculations:');
+    console.table(debugInfo.volumeCalculations);
+  }
+  
+  console.log('Final Cart Metrics:', {
+    totalCartEligible: allSmallVolume.length,
+    cartToAirCount: cartToAir.length,
+    cartToGroundCount: cartToGround,
+    cartAirPercentage: metrics.cartAirPercent + '%'
   });
 
   return metrics;
 }
 
+// Enhanced updateMetricsDisplay function with comparison support
 function updateMetricsDisplay(metrics, suffix = '') {
   const updateElement = (id, text) => {
     const el = document.getElementById(id + suffix);
@@ -381,7 +468,7 @@ function updateMetricsDisplay(metrics, suffix = '') {
   updateElement("smallVolTotal", `Potential Cart Total: ${metrics.smallVolTotal}`);
   updateElement("cartAirTotal", `Cart to Air Total: ${metrics.cartToAir}`);
   updateElement("cartGroundTotal", `Cart to Ground Total: ${metrics.cartToGround}`);
-  updateElement("cartAirPercent", `Cart to Air %: ${metrics.cartAirPercent}%`);
+  updateElement("cartAirPercent", `Cart to Air %: ${metrics.cartAirPercent}%`); // This was missing in comparison mode
   updateElement("total212", `Total MOD Transactions: ${metrics.modTransactionCount}`);
 }
 
@@ -552,15 +639,19 @@ function comparePeriods() {
   const metrics1 = calculateMetricsForData(period1Data);
   const metrics2 = calculateMetricsForData(period2Data);
   
+  // Update basic metrics display
   updateMetricsDisplay(metrics1, '1');
   updateMetricsDisplay(metrics2, '2');
+
+  // Calculate and display percentage changes
+  displayPercentageChanges(metrics1, metrics2);
 
   // Update date range display
   const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   document.getElementById("dateRange").textContent = 
     `Comparison: ${formatDate(period1Start)} - ${formatDate(period1End)} vs ${formatDate(period2Start)} - ${formatDate(period2End)}`;
 
-  console.log('Period comparison completed');
+  console.log('Period comparison completed with percentage changes');
 }
 
 function resetToFullData() {
@@ -797,6 +888,8 @@ function getVolumeRange(volume) {
 }
 
 // PDF Download Report Function with comparison support
+// Complete PDF Download Report Function with 3-column comparison support
+// Complete PDF Download Report Function with 3-column comparison support
 async function downloadReport() {
   if (transactionData.length === 0) {
     alert('No data available to generate report. Please upload a file first.');
@@ -821,32 +914,31 @@ async function downloadReport() {
       return false;
     };
 
-    // Header
+    // Simplified Header
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
     doc.setTextColor(47, 62, 77);
     doc.text('Air vs Ground Analysis Report', pageWidth / 2, yPosition, { align: 'center' });
     yPosition += 15;
 
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(108, 117, 125);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 10;
-
     const dateRangeEl = document.getElementById("dateRange");
     if (dateRangeEl && dateRangeEl.textContent !== "Date Range: Not loaded") {
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(108, 117, 125);
       doc.text(dateRangeEl.textContent, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 20;
+    } else {
+      yPosition += 10;
     }
-    yPosition += 25;
 
     if (isComparisonMode) {
-      // Comparison Mode Report
+      // Charts First - Enhanced Comparison Mode Report
       doc.setFontSize(16);
       doc.setFont(undefined, 'bold');
       doc.setTextColor(47, 62, 77);
       doc.text('Period Comparison Analysis', margin, yPosition);
-      yPosition += 20;
+      yPosition += 15;
 
       // Capture comparison charts
       const chartIds = ['dailyChart1', 'percentChart1', 'dailyChart2', 'percentChart2'];
@@ -882,8 +974,120 @@ async function downloadReport() {
         }
       }
 
+      // Performance Metrics Section - 3 Column Layout
+      checkPageBreak(120);
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(47, 62, 77);
+      doc.text('Performance Metrics Comparison', margin, yPosition);
+      yPosition += 15;
+
+      const colWidth = (pageWidth - 2 * margin) / 3;
+      const col1X = margin;
+      const col2X = margin + colWidth;
+      const col3X = margin + (2 * colWidth);
+
+      // Period 1 column
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(30, 136, 229);
+      doc.text('Period 1 Baseline', col1X, yPosition);
+      
+      // Period 2 column
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(229, 53, 53);
+      doc.text('Period 2 Results', col2X, yPosition);
+      
+      // Change column
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(76, 175, 80);
+      doc.text('% Change', col3X, yPosition);
+      
+      yPosition += 15;
+
+      // Get metrics for PDF (extract clean text only, avoiding HTML formatting)
+      const getCleanMetrics = (suffix = '') => {
+        const elementIds = [
+          "totalAirTrans" + suffix,
+          "totalGroundTrans" + suffix, 
+          "avgAirTime" + suffix,
+          "avgGroundTime" + suffix,
+          "airPercent" + suffix,
+          "groundPercent" + suffix,
+          "cartAirPercent" + suffix,
+          "smallVolTotal" + suffix
+        ];
+        
+        return elementIds.map(id => {
+          const el = document.getElementById(id);
+          if (!el) return '';
+          
+          // Get text content only, which ignores HTML spans
+          let text = el.textContent || el.innerText || '';
+          
+          // Remove any arrows and percentage changes that might be in the text
+          text = text.replace(/[↗↘]/g, '').replace(/\s*[+\-]\d+\.\d+%/g, '').trim();
+          
+          return text;
+        }).filter(item => item && item.length > 0);
+      };
+
+      const metrics1 = getCleanMetrics('1');
+      const metrics2 = getCleanMetrics('2');
+      
+      // Calculate changes for PDF using the actual metrics data
+      if (period1Data && period2Data) {
+        const m1 = calculateMetricsForData(period1Data);
+        const m2 = calculateMetricsForData(period2Data);
+        
+        const changes = [
+          calculatePercentChange(m1.airCount, m2.airCount),
+          calculatePercentChange(m1.groundCount, m2.groundCount),
+          calculatePercentChange(parseFloat(m1.avgAir), parseFloat(m2.avgAir)),
+          calculatePercentChange(parseFloat(m1.avgGround), parseFloat(m2.avgGround)),
+          calculatePercentChange(parseFloat(m1.airPercent), parseFloat(m2.airPercent)),
+          calculatePercentChange(parseFloat(m1.groundPercent), parseFloat(m2.groundPercent)),
+          calculatePercentChange(parseFloat(m1.cartAirPercent), parseFloat(m2.cartAirPercent)),
+          calculatePercentChange(m1.smallVolTotal, m2.smallVolTotal)
+        ];
+
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(0, 0, 0);
+        
+        const maxRows = Math.max(metrics1.length, metrics2.length, changes.length);
+        for (let i = 0; i < maxRows; i++) {
+          // Period 1 - plain black text
+          if (metrics1[i]) {
+            doc.setTextColor(0, 0, 0);
+            doc.text(metrics1[i], col1X, yPosition);
+          }
+          
+          // Period 2 - plain black text
+          if (metrics2[i]) {
+            doc.setTextColor(0, 0, 0);
+            doc.text(metrics2[i], col2X, yPosition);
+          }
+          
+          // Changes - color coded, clean format
+          if (changes[i]) {
+            const changeValue = parseFloat(changes[i]);
+            if (!isNaN(changeValue)) {
+              const changeColor = changeValue >= 0 ? [76, 175, 80] : [244, 67, 54]; // Green for positive, Red for negative
+              doc.setTextColor(...changeColor);
+              doc.text(changes[i] + '%', col3X, yPosition);
+              doc.setTextColor(0, 0, 0); // Reset to black
+            }
+          }
+          
+          yPosition += 10;
+        }
+      }
+
     } else {
-      // Single Period Report
+      // Single period report
       doc.setFontSize(16);
       doc.setFont(undefined, 'bold');
       doc.setTextColor(47, 62, 77);
@@ -923,78 +1127,40 @@ async function downloadReport() {
           }
         }
       }
-    }
 
-    // Metrics Section
-    checkPageBreak(100);
-    doc.setFontSize(16);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(47, 62, 77);
-    doc.text('Performance Metrics', margin, yPosition);
-    yPosition += 15;
-
-    const colWidth = (pageWidth - 2 * margin) / 3;
-    const col1X = margin;
-    const col2X = margin + colWidth;
-    const col3X = margin + (2 * colWidth);
-
-    // Get metrics from current display
-    const getMetrics = (suffix = '') => ({
-      volume: [
-        document.getElementById("smallVolTotal" + suffix)?.textContent || '',
-        document.getElementById("total212" + suffix)?.textContent || ''
-      ].filter(item => item),
-      air: [
-        document.getElementById("airPercent" + suffix)?.textContent || '',
-        document.getElementById("avgAirTime" + suffix)?.textContent || '',
-        document.getElementById("totalAirTrans" + suffix)?.textContent || ''
-      ].filter(item => item),
-      ground: [
-        document.getElementById("groundPercent" + suffix)?.textContent || '',
-        document.getElementById("avgGroundTime" + suffix)?.textContent || '',
-        document.getElementById("totalGroundTrans" + suffix)?.textContent || ''
-      ].filter(item => item)
-    });
-
-    if (isComparisonMode) {
-      // Comparison metrics side by side
-      const metrics1 = getMetrics('1');
-      const metrics2 = getMetrics('2');
-      
-      // Period 1 column
-      doc.setFontSize(14);
+      // Metrics Section for single period
+      checkPageBreak(100);
+      doc.setFontSize(16);
       doc.setFont(undefined, 'bold');
-      doc.setTextColor(30, 136, 229);
-      doc.text('Period 1 Metrics', col1X, yPosition);
-      let p1Y = yPosition + 12;
-      
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(0, 0, 0);
-      [...metrics1.volume, ...metrics1.air, ...metrics1.ground].forEach(item => {
-        doc.text(item, col1X, p1Y);
-        p1Y += 8;
+      doc.setTextColor(47, 62, 77);
+      doc.text('Performance Metrics', margin, yPosition);
+      yPosition += 15;
+
+      const colWidth = (pageWidth - 2 * margin) / 3;
+      const col1X = margin;
+      const col2X = margin + colWidth;
+      const col3X = margin + (2 * colWidth);
+
+      // Get metrics from current display
+      const getMetrics = () => ({
+        volume: [
+          document.getElementById("smallVolTotal")?.textContent || '',
+          document.getElementById("total212")?.textContent || ''
+        ].filter(item => item),
+        air: [
+          document.getElementById("airPercent")?.textContent || '',
+          document.getElementById("cartAirPercent")?.textContent || '',
+          document.getElementById("avgAirTime")?.textContent || '',
+          document.getElementById("totalAirTrans")?.textContent || ''
+        ].filter(item => item),
+        ground: [
+          document.getElementById("groundPercent")?.textContent || '',
+          document.getElementById("cartGroundTotal")?.textContent || '',
+          document.getElementById("avgGroundTime")?.textContent || '',
+          document.getElementById("totalGroundTrans")?.textContent || ''
+        ].filter(item => item)
       });
 
-      // Period 2 column
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      doc.setTextColor(229, 53, 53);
-      doc.text('Period 2 Metrics', col2X, yPosition);
-      let p2Y = yPosition + 12;
-      
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(0, 0, 0);
-      [...metrics2.volume, ...metrics2.air, ...metrics2.ground].forEach(item => {
-        doc.text(item, col2X, p2Y);
-        p2Y += 8;
-      });
-
-      yPosition = Math.max(p1Y, p2Y) + 20;
-
-    } else {
-      // Single period metrics in 3 columns
       const metrics = getMetrics();
 
       // Volume & Distribution
@@ -1050,12 +1216,46 @@ async function downloadReport() {
       doc.setFont(undefined, 'normal');
       doc.setTextColor(108, 117, 125);
       doc.text(`Air vs Ground Analysis Report - Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-      doc.text(`Generated by Excel Cart Analyzer v1.4`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+      doc.text(`Generated by Excel Cart Analyzer v1.5`, pageWidth - margin, pageHeight - 10, { align: 'right' });
     }
 
-    const fileName = isComparisonMode ? 'air-vs-ground-comparison-report.pdf' : 'air-vs-ground-analysis-report.pdf';
+    // Generate dynamic filename based on date ranges
+    let fileName;
+    if (isComparisonMode) {
+      const period1Start = document.getElementById('period1Start').value;
+      const period1End = document.getElementById('period1End').value;
+      const period2Start = document.getElementById('period2Start').value;
+      const period2End = document.getElementById('period2End').value;
+      
+      const formatDateForFile = (dateStr) => {
+        const date = new Date(dateStr);
+        return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      };
+      
+      const p1Start = formatDateForFile(period1Start);
+      const p1End = formatDateForFile(period1End);
+      const p2Start = formatDateForFile(period2Start);
+      const p2End = formatDateForFile(period2End);
+      
+      fileName = `air-vs-ground-comparison_${p1Start}-to-${p1End}_vs_${p2Start}-to-${p2End}.pdf`;
+    } else {
+      // For single analysis, get the date range from the data
+      const dates = transactionData
+        .map(t => new Date(t.date))
+        .filter(d => !isNaN(d.getTime()))
+        .sort((a, b) => a - b);
+      
+      if (dates.length > 0) {
+        const startDate = dates[0].toISOString().split('T')[0];
+        const endDate = dates[dates.length - 1].toISOString().split('T')[0];
+        fileName = `air-vs-ground-analysis_${startDate}-to-${endDate}.pdf`;
+      } else {
+        fileName = 'air-vs-ground-analysis-report.pdf';
+      }
+    }
+
     doc.save(fileName);
-    console.log('Enhanced Air vs Ground PDF report generated successfully');
+    console.log('Enhanced Air vs Ground PDF report generated successfully:', fileName);
     
   } catch (error) {
     console.error('Error generating PDF report:', error);
@@ -1097,6 +1297,81 @@ function handleAirGroundPageLoad() {
   
   // Clear the leaving flag
   localStorage.removeItem('spa_isLeaving');
+}
+
+function displayPercentageChanges(metrics1, metrics2) {
+  const calculatePercentChange = (oldValue, newValue) => {
+    if (oldValue === 0 && newValue === 0) return "0.00";
+    if (oldValue === 0) return "+∞";
+    const change = ((newValue - oldValue) / oldValue) * 100;
+    return (change >= 0 ? "+" : "") + change.toFixed(2);
+  };
+
+  // Extract numeric values from metrics
+  const getValue = (metrics, key) => {
+    switch(key) {
+      case 'airCount': return metrics.airCount;
+      case 'groundCount': return metrics.groundCount;
+      case 'avgAir': return parseFloat(metrics.avgAir);
+      case 'avgGround': return parseFloat(metrics.avgGround);
+      case 'airPercent': return parseFloat(metrics.airPercent);
+      case 'groundPercent': return parseFloat(metrics.groundPercent);
+      case 'smallVolTotal': return metrics.smallVolTotal;
+      case 'cartToAir': return metrics.cartToAir;
+      case 'cartToGround': return metrics.cartToGround;
+      case 'cartAirPercent': return parseFloat(metrics.cartAirPercent);
+      case 'modTransactionCount': return metrics.modTransactionCount;
+      default: return 0;
+    }
+  };
+
+  // Calculate percentage changes for all metrics
+  const changes = {
+    airCount: calculatePercentChange(getValue(metrics1, 'airCount'), getValue(metrics2, 'airCount')),
+    groundCount: calculatePercentChange(getValue(metrics1, 'groundCount'), getValue(metrics2, 'groundCount')),
+    avgAir: calculatePercentChange(getValue(metrics1, 'avgAir'), getValue(metrics2, 'avgAir')),
+    avgGround: calculatePercentChange(getValue(metrics1, 'avgGround'), getValue(metrics2, 'avgGround')),
+    airPercent: calculatePercentChange(getValue(metrics1, 'airPercent'), getValue(metrics2, 'airPercent')),
+    groundPercent: calculatePercentChange(getValue(metrics1, 'groundPercent'), getValue(metrics2, 'groundPercent')),
+    smallVolTotal: calculatePercentChange(getValue(metrics1, 'smallVolTotal'), getValue(metrics2, 'smallVolTotal')),
+    cartToAir: calculatePercentChange(getValue(metrics1, 'cartToAir'), getValue(metrics2, 'cartToAir')),
+    cartToGround: calculatePercentChange(getValue(metrics1, 'cartToGround'), getValue(metrics2, 'cartToGround')),
+    cartAirPercent: calculatePercentChange(getValue(metrics1, 'cartAirPercent'), getValue(metrics2, 'cartAirPercent')),
+    modTransactionCount: calculatePercentChange(getValue(metrics1, 'modTransactionCount'), getValue(metrics2, 'modTransactionCount'))
+  };
+
+  // Update Period 2 display with percentage changes
+  const updateElementWithChange = (id, baseText, changePercent) => {
+    const el = document.getElementById(id + '2');
+    if (el) {
+      const changeColor = parseFloat(changePercent) >= 0 ? '#4caf50' : '#f44336';
+      const changeSymbol = parseFloat(changePercent) >= 0 ? '↗' : '↘';
+      el.innerHTML = `${baseText} <span style="color: ${changeColor}; font-weight: bold; margin-left: 8px;">${changeSymbol} ${changePercent}%</span>`;
+    }
+  };
+
+  // Apply changes to Period 2 metrics
+  updateElementWithChange("totalAirTrans", `Total Air Transactions: ${getValue(metrics2, 'airCount')}`, changes.airCount);
+  updateElementWithChange("totalGroundTrans", `Total Ground Transactions: ${getValue(metrics2, 'groundCount')}`, changes.groundCount);
+  updateElementWithChange("avgAirTime", `Avg Air Time (min): ${metrics2.avgAir}`, changes.avgAir);
+  updateElementWithChange("avgGroundTime", `Avg Ground Time (min): ${metrics2.avgGround}`, changes.avgGround);
+  updateElementWithChange("airPercent", `Air %: ${metrics2.airPercent}%`, changes.airPercent);
+  updateElementWithChange("groundPercent", `Ground %: ${metrics2.groundPercent}%`, changes.groundPercent);
+  updateElementWithChange("smallVolTotal", `Potential Cart Total: ${getValue(metrics2, 'smallVolTotal')}`, changes.smallVolTotal);
+  updateElementWithChange("cartAirTotal", `Cart to Air Total: ${getValue(metrics2, 'cartToAir')}`, changes.cartToAir);
+  updateElementWithChange("cartGroundTotal", `Cart to Ground Total: ${getValue(metrics2, 'cartToGround')}`, changes.cartToGround);
+  updateElementWithChange("cartAirPercent", `Cart to Air %: ${metrics2.cartAirPercent}%`, changes.cartAirPercent);
+  updateElementWithChange("total212", `Total MOD Transactions: ${getValue(metrics2, 'modTransactionCount')}`, changes.modTransactionCount);
+
+  // Log the changes for debugging
+  console.log('Percentage Changes from Period 1 to Period 2:', changes);
+}
+
+function calculatePercentChange(oldValue, newValue) {
+  if (oldValue === 0 && newValue === 0) return "0.00";
+  if (oldValue === 0) return "+∞";
+  const change = ((newValue - oldValue) / oldValue) * 100;
+  return (change >= 0 ? "+" : "") + change.toFixed(2);
 }
 
 // Load on page ready
