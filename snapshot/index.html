@@ -7,7 +7,7 @@
   <title>Snapshot Analyzer</title>
 
   <!-- Styles -->
-  <link rel="stylesheet" href="../shared/sidebar.css" />
+  <link rel="stylesheet" href="../sidebar.css" />
   <link rel="stylesheet" href="styles.css">
 
   <!-- External Libraries -->
@@ -122,10 +122,9 @@
       </div>
     </div>
   </div>
-
   <!-- Script to load sidebar -->
   <script>
-    fetch("../shared/sidebar.html")
+    fetch("../sidebar.html")
       .then(res => res.text())
       .then(html => {
         document.getElementById("sidebar-container").innerHTML = html;

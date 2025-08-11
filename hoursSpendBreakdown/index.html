@@ -7,7 +7,7 @@
   <title>Inbound Hours Breakdown</title>
 
   <!-- Styles -->
-  <link rel="stylesheet" href="../shared/sidebar.css" />
+  <link rel="stylesheet" href="../sidebar.css" />
   <link rel="stylesheet" href="styles.css" />
 
   <!-- Scripts -->
@@ -121,7 +121,7 @@
 
   <!-- Custom JS + Sidebar Loader -->
   <script>
-    fetch("../shared/sidebar.html")
+    fetch("../sidebar.html")
       .then(res => res.text())
       .then(html => {
         document.getElementById("sidebar-container").innerHTML = html;
