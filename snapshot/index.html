@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Snapshot Analyzer</title>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="../sidebar.css" />
-  <link rel="stylesheet" href="styles.css">
+  <!-- Styles - Updated to root-relative paths -->
+  <link rel="stylesheet" href="/IB-Tool/shared/sidebar.css" />
+  <link rel="stylesheet" href="/IB-Tool/snapshot/styles.css">
 
   <!-- External Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -122,29 +122,31 @@
       </div>
     </div>
   </div>
-  <!-- Script to load sidebar -->
+  
+  <!-- Script to load sidebar - Already correct! -->
   <script>
-    fetch("../sidebar.html")
+    fetch("/IB-Tool/shared/sidebar.html")
       .then(res => res.text())
       .then(html => {
         document.getElementById("sidebar-container").innerHTML = html;
       });
   </script>
-  <!-- Core configuration and utilities first -->
-  <script src="./js/snapshot-config.js"></script>
-  <script src="./js/snapshot-utils.js"></script>
+  
+  <!-- Core configuration and utilities first - Updated to root-relative paths -->
+  <script src="/IB-Tool/snapshot/js/snapshot-config.js"></script>
+  <script src="/IB-Tool/snapshot/js/snapshot-utils.js"></script>
 
   <!-- Data handling and calculations -->
-  <script src="./js/snapshot-data.js"></script>
-  <script src="./js/snapshot-calculations.js"></script>
+  <script src="/IB-Tool/snapshot/js/snapshot-data.js"></script>
+  <script src="/IB-Tool/snapshot/js/snapshot-calculations.js"></script>
 
   <!-- Display and storage -->
-  <script src="./js/snapshot-display.js"></script>
-  <script src="./js/snapshot-storage.js"></script>
-  <script src="./js/snapshot-insights.js"></script>
+  <script src="/IB-Tool/snapshot/js/snapshot-display.js"></script>
+  <script src="/IB-Tool/snapshot/js/snapshot-storage.js"></script>
+  <script src="/IB-Tool/snapshot/js/snapshot-insights.js"></script>
 
   <!-- Main orchestrator last -->
-  <script src="./js/snapshot-main.js"></script>
+  <script src="/IB-Tool/snapshot/js/snapshot-main.js"></script>
 
 </body>
 

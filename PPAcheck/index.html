@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PPA Analyzer</title>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="../sidebar.css" />
-  <link rel="stylesheet" href="styles.css">
+  <!-- Styles - Updated to root-relative paths -->
+  <link rel="stylesheet" href="/IB-Tool/shared/sidebar.css" />
+  <link rel="stylesheet" href="/IB-Tool/PPAcheck/styles.css">
 
   <!-- External Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -28,7 +28,7 @@
         📂 Select Excel File to Analyze
       </button>
       <input type="file" id="fileInput" accept=".xlsx, .xls" onchange="handleFile(event)" style="display: none;" />
-      
+
       <!-- File Info Display -->
       <div class="file-info" id="fileInfo" style="display: none;">
         <div class="file-details">
@@ -36,28 +36,29 @@
           <div class="file-text">
             <div class="file-name" id="fileName"></div>
             <div class="file-metadata">
-              <span id="fileSize"></span> • 
+              <span id="fileSize"></span> •
               <span id="fileDate"></span>
             </div>
           </div>
         </div>
       </div>
-      
-      <button onclick="clearPPAData()" class="reset-button" id="clearButton" style="display: none; margin-top: 1rem;">🔄 Clear Data</button>
+
+      <button onclick="clearPPAData()" class="reset-button" id="clearButton" style="display: none; margin-top: 1rem;">🔄
+        Clear Data</button>
     </div>
 
     <div class="summary" id="summarySection" style="display: none;">
       <h2>📊 PPA Analysis Results</h2>
       <div id="results" class="results-grid"></div>
-      
+
       <!-- Volume Analysis Section -->
       <div class="volume-analysis" id="volumeAnalysis" style="display: none;">
         <h3>📦 Volume Analysis (Reach Truck Only)</h3>
         <div class="volume-results">
           <div class="volume-metric">
             <span class="volume-label">Small Volume Items (< 5000 cubic):</span>
-            <span class="volume-value" id="smallVolumeCount">0</span>
-            <span class="volume-percent" id="smallVolumePercent">(0%)</span>
+                <span class="volume-value" id="smallVolumeCount">0</span>
+                <span class="volume-percent" id="smallVolumePercent">(0%)</span>
           </div>
         </div>
       </div>
@@ -77,15 +78,17 @@
     </div>
   </div>
 
-  <!-- Script to load sidebar -->
+  <!-- Script to load sidebar - Already correct! -->
   <script>
-    fetch("../sidebar.html")
+    fetch("/IB-Tool/shared/sidebar.html")
       .then(res => res.text())
       .then(html => {
         document.getElementById("sidebar-container").innerHTML = html;
       });
   </script>
-  <script src="PPA.js"></script>
+  
+  <!-- JavaScript - Updated to root-relative path -->
+  <script src="/IB-Tool/PPAcheck/PPA.js"></script>
 </body>
 
 </html>

@@ -4,58 +4,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IB Tools SPA</title>
-  <link rel="stylesheet" href="sidebar.css" />
+  <title>IB Tools Dashboard</title>
+  <link rel="stylesheet" href="/IB-Tool/shared/sidebar.css" />
+  <link rel="stylesheet" href="/IB-Tool/styles.css" />
 </head>
+
 <body>
   <div id="sidebar-container"></div>
 
   <div class="main">
     <div id="view-home" class="view">
-      <h1>Welcome to Inbound Department Metrics</h1>
-      <p>Select a tool from the left menu to get started.</p>
+      <h1>🏠 Inbound Department Metrics Dashboard</h1>
+      <div class="dashboard-welcome">
+        <p>Welcome to the comprehensive Inbound Department analysis toolkit.</p>
+        <p>Select a tool from the left menu to get started with your analysis:</p>
+        
+        <div class="tool-overview">
+          <div class="tool-card">
+            <h3>📊 Air vs Ground Analyzer</h3>
+            <p>Analyze transaction distribution between air and ground locations with cart optimization insights.</p>
+          </div>
+          
+          <div class="tool-card">
+            <h3>📦 PPA Check</h3>
+            <p>Perform PPA (Pieces Per Associate) analysis and validation.</p>
+          </div>
+          
+          <div class="tool-card">
+            <h3>✅ Hours Breakdown</h3>
+            <p>Break down and compare labor hours across different functions and time periods.</p>
+          </div>
+          
+          <div class="tool-card">
+            <h3>📷 Snapshot Analyzer</h3>
+            <p>Comprehensive operational snapshot analysis with KPI dashboard and insights.</p>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div id="view-air" class="view" style="display:none">
-      <h1>Air vs Ground Analyzer</h1>
-      <!-- Placeholder for air tool UI -->
-      <p>Air vs Ground logic will be loaded here...</p>
-    </div>
-
-    <div id="view-hours" class="view" style="display:none">
-      <h1>Hours Breakdown</h1>
-      <!-- Placeholder for hours tool UI -->
-      <p>Hours breakdown logic will be loaded here...</p>
-    </div>
-
-    <div id="view-ppa" class="view" style="display:none">
-      <h1>PPA Analyzer</h1>
-      <!-- Placeholder for PPA tool UI -->
-      <p>PPA logic will be loaded here...</p>
-    </div>
+    <!-- Remove the placeholder views since you're using folder-based navigation -->
+    <!-- The actual tools are in their respective folders -->
   </div>
 
   <script>
-    fetch("./sidebar.html")
+    fetch("/IB-Tool/shared/sidebar.html")
       .then(res => res.text())
       .then(html => {
         document.getElementById("sidebar-container").innerHTML = html;
-        setupRouting();
       });
 
-    function setupRouting() {
-      window.addEventListener("hashchange", handleRoute);
-      handleRoute();
-    }
-
-    function handleRoute() {
-      const hash = location.hash.replace('#', '') || 'home';
-      document.querySelectorAll('.view').forEach(view => {
-        view.style.display = 'none';
-      });
-      const target = document.getElementById(`view-${hash}`);
-      if (target) target.style.display = 'block';
-    }
+    // Remove the hash routing since you're using folder-based navigation
+    // If you want to keep it for future use, you can add it back later
   </script>
 </body>
 

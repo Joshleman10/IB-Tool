@@ -12,9 +12,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="../sidebar.css" />
-  <link rel="stylesheet" href="styles.css" />
+  <!-- Styles - Updated to root-relative paths -->
+  <link rel="stylesheet" href="/IB-Tool/shared/sidebar.css" />
+  <link rel="stylesheet" href="/IB-Tool/airVsGroundAnalyzer/styles.css" />
 </head>
 
 <body>
@@ -35,7 +35,7 @@
         📂 Select Excel File to Analyze
       </button>
       <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none" onchange="handleFile(event)" />
-      
+
       <!-- File Info Display -->
       <div class="file-info" id="fileInfo" style="display: none;">
         <div class="file-details">
@@ -43,7 +43,7 @@
           <div class="file-text">
             <div class="file-name" id="fileName"></div>
             <div class="file-metadata">
-              <span id="fileSize"></span> • 
+              <span id="fileSize"></span> •
               <span id="fileDate"></span>
             </div>
           </div>
@@ -213,13 +213,15 @@
 
   <!-- Custom Logic -->
   <script>
-    fetch("../sidebar.html")
+    fetch("/IB-Tool/shared/sidebar.html")
       .then(res => res.text())
       .then(html => {
         document.getElementById("sidebar-container").innerHTML = html;
       });
   </script>
-  <script src="airVsGround.js"></script>
+  
+  <!-- JavaScript - Updated to root-relative path -->
+  <script src="/IB-Tool/airVsGroundAnalyzer/airVsGround.js"></script>
 </body>
 
 </html>
