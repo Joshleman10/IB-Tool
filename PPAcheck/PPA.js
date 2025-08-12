@@ -1,3 +1,19 @@
+// Use the environment detection already set up in the HTML page
+// (basePath is already available from the main page's environment detection)
+
+// Function to get correct paths
+function getResourcePath(relativePath) {
+  // If basePath is not available (shouldn't happen), fall back to detection
+  const currentBasePath = window.basePath || (() => {
+    const isLocal = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' || 
+                    window.location.hostname === '';
+    return isLocal ? '' : '/IB-Tool';
+  })();
+  
+  return currentBasePath + relativePath;
+}
+
 const vasLocations = [
   "SM.SHRNKWRP", "LG.SHRNKWRP", "IBCASEPACK", "IBREMOUCA", "IBTAPEBAG",
   "IBCOVERCSUPC", "IBLARGETAPE", "IBTAPETOP", "IBINSPECT", "IB-QA-INSPECT",
@@ -28,9 +44,10 @@ window.addEventListener('beforeunload', () => {
   localStorage.setItem('spa_isLeaving', 'true');
 });
 
-// Load item master from Air vs Ground directory
-console.log('Attempting to load item master from: ../air vs ground analyzer/item_master.json');
-fetch('../air vs ground analyzer/item_master.json')
+// Load item master from airVsGroundAnalyzer directory - CORRECTED PATH
+const itemMasterPath = getResourcePath('/airVsGroundAnalyzer/item_master.json');
+console.log('Attempting to load item master from:', itemMasterPath);
+fetch(itemMasterPath)
   .then(response => {
     console.log('Fetch response status:', response.status);
     console.log('Fetch response ok:', response.ok);
@@ -67,26 +84,6 @@ fetch('../air vs ground analyzer/item_master.json')
       name: error.name
     });
     console.warn('Volume analysis will be disabled without item master data');
-    
-    // Try alternative path
-    console.log('Trying alternative path: ../air-vs-ground/item_master.json');
-    return fetch('../air-vs-ground/item_master.json')
-      .then(response => response.json())
-      .then(data => {
-        if (data && data['Sheet1']) {
-          itemMasterData = data['Sheet1'].reduce((map, item) => {
-            const key = Math.floor(Number(item.ITEM_NUMBER));
-            map[key] = item;
-            return map;
-          }, {});
-          console.log('Item master loaded from alternative path!');
-          // Re-run volume analysis if we have data waiting
-          if (currentPPARows) {
-            displayVolumeAnalysisOnly(currentPPARows);
-          }
-        }
-      })
-      .catch(err => console.log('Alternative path also failed:', err.message));
   });
 
 function handleFile(event) {
@@ -173,7 +170,7 @@ function displayPPAResults(rows) {
     const reachSet = new Set();
     const cartSet = new Set();
     
-    // CORRECTED: Track all cart LPs to exclude from small volume analysis
+    // Track all cart LPs to exclude from small volume analysis
     const cartLPs = new Set();
     
     // Volume analysis for reach truck items
@@ -204,19 +201,19 @@ function displayPPAResults(rows) {
       }
       if (cartLocations.includes(loc)) {
         cartSet.add(lp);
-        // CORRECTED: Track all cart LPs
+        // Track all cart LPs
         cartLPs.add(lp);
       }
     });
 
-    // CORRECTED: Perform volume analysis on reach truck items, excluding cart LPs
+    // Perform volume analysis on reach truck items, excluding cart LPs
     if (Object.keys(itemMasterData).length > 0) {
       console.log('Performing volume analysis...');
       console.log(`Total reach truck items: ${reachTruckItems.length}`);
       console.log(`Total cart LPs to exclude: ${cartLPs.size}`);
       
       reachTruckItems.forEach(item => {
-        // CORRECTED: Skip items that are already in Cart PPA
+        // Skip items that are already in Cart PPA
         if (cartLPs.has(item.lp)) {
           console.log(`Skipping LP ${item.lp} - already in Cart PPA`);
           return;
@@ -298,7 +295,7 @@ function displayPPAResults(rows) {
       }).join('');
     }
 
-    // CORRECTED: Display volume analysis with proper exclusion logic
+    // Display volume analysis with proper exclusion logic
     if (Object.keys(itemMasterData).length > 0 && reachTruckItems.length > 0) {
       displayVolumeAnalysis(reachTruckItems, smallVolumeItems, cartLPs);
     } else if (reachTruckItems.length > 0) {
@@ -337,20 +334,20 @@ function displayVolumeAnalysisOnly(rows) {
         }
       }
       
-      // CORRECTED: Also track cart LPs in retry function
+      // Also track cart LPs in retry function
       if (cartLocations.includes(loc)) {
         cartLPs.add(lp);
       }
     });
 
-    // CORRECTED: Perform volume analysis excluding cart LPs
+    // Perform volume analysis excluding cart LPs
     if (Object.keys(itemMasterData).length > 0) {
       console.log('Re-running volume analysis...');
       console.log(`Total reach truck items: ${reachTruckItems.length}`);
       console.log(`Total cart LPs to exclude: ${cartLPs.size}`);
       
       reachTruckItems.forEach(item => {
-        // CORRECTED: Skip items that are already in Cart PPA
+        // Skip items that are already in Cart PPA
         if (cartLPs.has(item.lp)) {
           return;
         }
@@ -379,14 +376,14 @@ function displayVolumeAnalysisOnly(rows) {
   }
 }
 
-// CORRECTED: Updated to show proper exclusion statistics
+// Updated to show proper exclusion statistics
 function displayVolumeAnalysis(reachTruckItems, smallVolumeItems, cartLPs) {
   const volumeAnalysisEl = document.getElementById("volumeAnalysis");
   const smallVolumeCountEl = document.getElementById("smallVolumeCount");
   const smallVolumePercentEl = document.getElementById("smallVolumePercent");
 
   if (volumeAnalysisEl && smallVolumeCountEl && smallVolumePercentEl) {
-    // CORRECTED: Calculate totals excluding cart LPs
+    // Calculate totals excluding cart LPs
     const reachItemsNotInCart = reachTruckItems.filter(item => !cartLPs.has(item.lp));
     const totalReachItemsNotInCart = reachItemsNotInCart.length;
     const smallVolumeCount = smallVolumeItems.length;
@@ -400,7 +397,7 @@ function displayVolumeAnalysis(reachTruckItems, smallVolumeItems, cartLPs) {
     volumeAnalysisEl.style.display = "block";
 
     // Enhanced logging for debugging
-    console.log('=== CORRECTED VOLUME ANALYSIS RESULTS ===');
+    console.log('=== VOLUME ANALYSIS RESULTS ===');
     console.log(`Total reach truck items: ${reachTruckItems.length}`);
     console.log(`Cart LPs (excluded): ${cartLPs.size}`);
     console.log(`RT items analyzed: ${totalReachItemsNotInCart}`);

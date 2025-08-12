@@ -5,8 +5,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>IB Tools Dashboard</title>
-  <link rel="stylesheet" href="/IB-Tool/shared/sidebar.css" />
-  <link rel="stylesheet" href="/IB-Tool/styles.css" />
+  
+  <!-- Environment Detection Script -->
+  <script>
+    // Auto-detect environment and set base path
+    const isLocal = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' || 
+                    window.location.hostname === '';
+    const basePath = isLocal ? '' : '/IB-Tool';
+    
+    // Function to create path-aware links
+    function createLink(href, rel = 'stylesheet') {
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = basePath + href;
+      document.head.appendChild(link);
+    }
+    
+    // Create CSS links
+    createLink('/shared/sidebar.css');
+    createLink('/styles.css');
+  </script>
 </head>
 
 <body>
@@ -37,7 +56,7 @@
           
           <div class="tool-card">
             <h3>📷 Snapshot Analyzer</h3>
-            <p>Comprehensive operational snapshot analysis with KPI dashboard and insights (Work in Progress)</p>
+            <p>Comprehensive operational snapshot analysis with KPI dashboard and insights.</p>
           </div>
         </div>
       </div>
@@ -48,7 +67,18 @@
   </div>
 
   <script>
-    fetch("/IB-Tool/shared/sidebar.html")
+    // Global navigation function for sidebar
+    window.navigateToTool = function(path) {
+      if (path === '') {
+        // Home page
+        window.location.href = basePath + '/';
+      } else {
+        // Tool pages
+        window.location.href = basePath + '/' + path;
+      }
+    };
+
+    fetch(basePath + "/shared/sidebar.html")
       .then(res => res.text())
       .then(html => {
         document.getElementById("sidebar-container").innerHTML = html;

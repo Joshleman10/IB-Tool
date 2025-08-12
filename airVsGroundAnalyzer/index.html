@@ -6,15 +6,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Air vs Ground Analysis</title>
 
+  <!-- Environment Detection Script -->
+  <script>
+    // Auto-detect environment and set base path
+    const isLocal = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' || 
+                    window.location.hostname === '';
+    const basePath = isLocal ? '' : '/IB-Tool';
+    
+    // Function to create path-aware links
+    function createLink(href, rel = 'stylesheet') {
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = basePath + href;
+      document.head.appendChild(link);
+    }
+    
+    // Create CSS links
+    createLink('/shared/sidebar.css');
+    createLink('/airVsGroundAnalyzer/styles.css');
+  </script>
+
   <!-- External libraries -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-  <!-- Styles - Updated to root-relative paths -->
-  <link rel="stylesheet" href="/IB-Tool/shared/sidebar.css" />
-  <link rel="stylesheet" href="/IB-Tool/airVsGroundAnalyzer/styles.css" />
 </head>
 
 <body>
@@ -32,7 +49,7 @@
     <!-- File Upload Section -->
     <div class="upload-section">
       <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
-        📂 Select Excel File to Analyze (212 Transactions Only)
+        📂 Select Excel File to Analyze
       </button>
       <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none" onchange="handleFile(event)" />
 
@@ -213,15 +230,30 @@
 
   <!-- Custom Logic -->
   <script>
-    fetch("/IB-Tool/shared/sidebar.html")
+    // Global navigation function for sidebar
+    window.navigateToTool = function(path) {
+      if (path === '') {
+        // Home page
+        window.location.href = basePath + '/';
+      } else {
+        // Tool pages
+        window.location.href = basePath + '/' + path;
+      }
+    };
+
+    fetch(basePath + "/shared/sidebar.html")
       .then(res => res.text())
       .then(html => {
         document.getElementById("sidebar-container").innerHTML = html;
       });
   </script>
   
-  <!-- JavaScript - Updated to root-relative path -->
-  <script src="/IB-Tool/airVsGroundAnalyzer/airVsGround.js"></script>
+  <!-- JavaScript - Environment-aware path -->
+  <script>
+    const jsScript = document.createElement('script');
+    jsScript.src = basePath + '/airVsGroundAnalyzer/airVsGround.js';
+    document.head.appendChild(jsScript);
+  </script>
 </body>
 
 </html>

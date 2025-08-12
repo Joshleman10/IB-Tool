@@ -6,9 +6,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Snapshot Analyzer</title>
 
-  <!-- Styles - Updated to root-relative paths -->
-  <link rel="stylesheet" href="/IB-Tool/shared/sidebar.css" />
-  <link rel="stylesheet" href="/IB-Tool/snapshot/styles.css">
+  <!-- Environment Detection Script -->
+  <script>
+    // Auto-detect environment and set base path
+    const isLocal = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' || 
+                    window.location.hostname === '';
+    const basePath = isLocal ? '' : '/IB-Tool';
+    
+    // Function to create path-aware links
+    function createLink(href, rel = 'stylesheet') {
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = basePath + href;
+      document.head.appendChild(link);
+    }
+    
+    // Create CSS links
+    createLink('/shared/sidebar.css');
+    createLink('/snapshot/styles.css');
+  </script>
 
   <!-- External Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -26,7 +43,7 @@
     <div class="input-section">
       <div class="input-card">
         <h2>📂 Upload Excel Data</h2>
-        <p>Run Search Transactions (ALL) for desired date range:</p>
+        <p>Select your operational Excel file for analysis:</p>
         <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
           📊 Select Excel File
         </button>
@@ -122,31 +139,46 @@
       </div>
     </div>
   </div>
-  
-  <!-- Script to load sidebar - Already correct! -->
+  <!-- Script to load sidebar - Environment-aware -->
   <script>
-    fetch("/IB-Tool/shared/sidebar.html")
+    // Global navigation function for sidebar
+    window.navigateToTool = function(path) {
+      if (path === '') {
+        // Home page
+        window.location.href = basePath + '/';
+      } else {
+        // Tool pages
+        window.location.href = basePath + '/' + path;
+      }
+    };
+
+    fetch(basePath + "/shared/sidebar.html")
       .then(res => res.text())
       .then(html => {
         document.getElementById("sidebar-container").innerHTML = html;
       });
   </script>
   
-  <!-- Core configuration and utilities first - Updated to root-relative paths -->
-  <script src="/IB-Tool/snapshot/js/snapshot-config.js"></script>
-  <script src="/IB-Tool/snapshot/js/snapshot-utils.js"></script>
-
-  <!-- Data handling and calculations -->
-  <script src="/IB-Tool/snapshot/js/snapshot-data.js"></script>
-  <script src="/IB-Tool/snapshot/js/snapshot-calculations.js"></script>
-
-  <!-- Display and storage -->
-  <script src="/IB-Tool/snapshot/js/snapshot-display.js"></script>
-  <script src="/IB-Tool/snapshot/js/snapshot-storage.js"></script>
-  <script src="/IB-Tool/snapshot/js/snapshot-insights.js"></script>
-
-  <!-- Main orchestrator last -->
-  <script src="/IB-Tool/snapshot/js/snapshot-main.js"></script>
+  <!-- Core configuration and utilities first - Environment-aware paths -->
+  <script>
+    // Load all JavaScript files with environment-aware paths
+    const jsFiles = [
+      '/snapshot/js/snapshot-config.js',
+      '/snapshot/js/snapshot-utils.js',
+      '/snapshot/js/snapshot-data.js',
+      '/snapshot/js/snapshot-calculations.js',
+      '/snapshot/js/snapshot-display.js',
+      '/snapshot/js/snapshot-storage.js',
+      '/snapshot/js/snapshot-insights.js',
+      '/snapshot/js/snapshot-main.js'
+    ];
+    
+    jsFiles.forEach(file => {
+      const script = document.createElement('script');
+      script.src = basePath + file;
+      document.head.appendChild(script);
+    });
+  </script>
 
 </body>
 
